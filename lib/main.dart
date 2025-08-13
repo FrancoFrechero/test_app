@@ -15,7 +15,58 @@ class RunClubApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF3B82F6)),
         fontFamily: 'SF Pro',
       ),
-      home: const RootScaffold(),
+      home: const AuthGate(),
+    );
+  }
+}
+
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _loggedIn = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loggedIn) return const RootScaffold();
+    return LoginPage(onLogin: () => setState(() => _loggedIn = true));
+  }
+}
+
+class LoginPage extends StatelessWidget {
+  final VoidCallback onLogin;
+  const LoginPage({super.key, required this.onLogin});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Sign In')),
+      body: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const TextField(decoration: InputDecoration(labelText: 'Email')),
+            const SizedBox(height: 12),
+            const TextField(
+              decoration: InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: onLogin,
+                child: const Text('Login'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -28,7 +79,7 @@ class RootScaffold extends StatefulWidget {
 
 class _RootScaffoldState extends State<RootScaffold> {
   int _idx = 0;
-  final _pages = const [RunsPage(), FeedPage(), ProfilePage()];
+  final _pages = const [RunsPage(), FeedPage(), TipsPage(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +101,11 @@ class _RootScaffoldState extends State<RootScaffold> {
             icon: Icon(Icons.dynamic_feed_outlined),
             selectedIcon: Icon(Icons.dynamic_feed),
             label: 'Feed',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.tips_and_updates_outlined),
+            selectedIcon: Icon(Icons.tips_and_updates),
+            label: 'Tips',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -409,6 +465,37 @@ class FeedPage extends StatelessWidget {
   }
 }
 
+/// -------------------- Tips --------------------
+
+class TipsPage extends StatelessWidget {
+  const TipsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Running Tips')),
+      body: ListView.separated(
+        padding: const EdgeInsets.all(16),
+        itemCount: demoTips.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, i) {
+          final tip = demoTips[i];
+          return Card(
+            elevation: 0,
+            child: ListTile(
+              title: Text(
+                tip.title,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+              subtitle: Text(tip.body),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 /// -------------------- Profile --------------------
 
 class ProfilePage extends StatelessWidget {
@@ -509,6 +596,11 @@ class Post {
   const Post({required this.author, required this.text, required this.timeAgo});
 }
 
+class Tip {
+  final String title, body;
+  const Tip({required this.title, required this.body});
+}
+
 final demoRuns = <Run>[
   Run(
     id: 'r1',
@@ -565,5 +657,20 @@ final demoPosts = <Post>[
     author: const User('Lina M'),
     text: 'New shoes day ✨ Loving the bounce.',
     timeAgo: '1d',
+  ),
+];
+
+final demoTips = <Tip>[
+  Tip(
+    title: 'Warm Up',
+    body: 'Start with a light jog and dynamic stretches.',
+  ),
+  Tip(
+    title: 'Hydrate',
+    body: 'Drink water before, during, and after your runs.',
+  ),
+  Tip(
+    title: 'Rest Days',
+    body: 'Schedule rest days to allow your body to recover.',
   ),
 ];
