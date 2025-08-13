@@ -1,6 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 
-void main() => runApp(const RunClubApp());
+import 'app_state.dart';
+import 'models.dart';
+import 'reminder_service.dart';
+
+void main() => runApp(
+      ChangeNotifierProvider(
+        create: (_) => RunClubState(ReminderService()),
+        child: const RunClubApp(),
+      ),
+    );
 
 class RunClubApp extends StatelessWidget {
   const RunClubApp({super.key});
@@ -32,11 +43,21 @@ class _RootScaffoldState extends State<RootScaffold> {
 
   @override
   Widget build(BuildContext context) {
+    final state = context.watch<RunClubState>();
     return Scaffold(
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 250),
         child: _pages[_idx],
       ),
+      floatingActionButton: _idx == 0 && state.isCoach
+          ? FloatingActionButton(
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const CreateRunPage()),
+              ),
+              child: const Icon(Icons.add),
+            )
+          : null,
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
         onDestinationSelected: (i) => setState(() => _idx = i),
@@ -69,6 +90,7 @@ class RunsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final runs = context.watch<RunClubState>().runs;
     return CustomScrollView(
       slivers: [
         const SliverAppBar(
@@ -79,9 +101,9 @@ class RunsPage extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverList.separated(
-            itemCount: demoRuns.length,
+            itemCount: runs.length,
             separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, i) => RunCard(run: demoRuns[i]),
+            itemBuilder: (context, i) => RunCard(run: runs[i]),
           ),
         ),
       ],
@@ -170,20 +192,14 @@ class RunCard extends StatelessWidget {
   }
 }
 
-class RunDetails extends StatefulWidget {
+class RunDetails extends StatelessWidget {
   final Run run;
   const RunDetails({super.key, required this.run});
 
   @override
-  State<RunDetails> createState() => _RunDetailsState();
-}
-
-class _RunDetailsState extends State<RunDetails> {
-  bool joined = false;
-
-  @override
   Widget build(BuildContext context) {
-    final run = widget.run;
+    final appState = context.watch<RunClubState>();
+    final joined = appState.isJoined(run);
     final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
@@ -275,13 +291,13 @@ class _RunDetailsState extends State<RunDetails> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
           child: FilledButton.icon(
             onPressed: () {
-              setState(() => joined = !joined);
+              appState.toggleJoin(run);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
                   content: Text(
                     joined
-                        ? 'You joined ${run.title} 🎉'
-                        : 'You left ${run.title}',
+                        ? 'You left ${run.title}'
+                        : 'You joined ${run.title} 🎉',
                   ),
                 ),
               );
@@ -417,6 +433,7 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final state = context.watch<RunClubState>();
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: Padding(
@@ -446,10 +463,202 @@ class ProfilePage extends StatelessWidget {
                 _Stat(label: 'Pace', value: '5:12'),
               ],
             ),
+            const SizedBox(height: 24),
+            if (!state.isCoach)
+              FilledButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const CoachSignInPage(),
+                  ),
+                ),
+                child: const Text('Coach Sign In'),
+              )
+            else
+              Text(
+                'Signed in as Coach',
+                style: TextStyle(color: cs.primary),
+              ),
           ],
         ),
       ),
     );
+  }
+}
+
+class CoachSignInPage extends StatefulWidget {
+  const CoachSignInPage({super.key});
+
+  @override
+  State<CoachSignInPage> createState() => _CoachSignInPageState();
+}
+
+class _CoachSignInPageState extends State<CoachSignInPage> {
+  final _nameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  String? _error;
+
+  void _signIn() {
+    try {
+      context
+          .read<RunClubState>()
+          .signInAsCoach(_nameController.text, _passwordController.text);
+      Navigator.pop(context);
+    } catch (e) {
+      setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Coach Sign In')),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            TextField(
+              controller: _passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              ),
+            const SizedBox(height: 20),
+            FilledButton(
+              onPressed: _signIn,
+              child: const Text('Sign In'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+}
+
+class CreateRunPage extends StatefulWidget {
+  const CreateRunPage({super.key});
+
+  @override
+  State<CreateRunPage> createState() => _CreateRunPageState();
+}
+
+class _CreateRunPageState extends State<CreateRunPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _distanceController = TextEditingController();
+  final _paceController = TextEditingController();
+  DateTime? _dateTime;
+
+  Future<void> _pickDateTime() async {
+    final date = await showDatePicker(
+      context: context,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: DateTime.now(),
+    );
+    if (date == null) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: const TimeOfDay(hour: 6, minute: 0),
+    );
+    if (time == null) return;
+    setState(() {
+      _dateTime = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+    });
+  }
+
+  void _save() {
+    if (_formKey.currentState!.validate() && _dateTime != null) {
+      context.read<RunClubState>().createRun(
+            title: _titleController.text,
+            city: _cityController.text,
+            location: _locationController.text,
+            distanceKm: double.tryParse(_distanceController.text) ?? 0,
+            paceMinPerKm: _paceController.text,
+            dateTime: _dateTime!,
+          );
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Create Run')),
+      body: Form(
+        key: _formKey,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+              validator: (v) => v!.isEmpty ? 'Enter title' : null,
+            ),
+            TextFormField(
+              controller: _cityController,
+              decoration: const InputDecoration(labelText: 'City'),
+              validator: (v) => v!.isEmpty ? 'Enter city' : null,
+            ),
+            TextFormField(
+              controller: _locationController,
+              decoration: const InputDecoration(labelText: 'Location'),
+              validator: (v) => v!.isEmpty ? 'Enter location' : null,
+            ),
+            TextFormField(
+              controller: _distanceController,
+              decoration: const InputDecoration(labelText: 'Distance (km)'),
+              keyboardType: TextInputType.number,
+              validator: (v) => v!.isEmpty ? 'Enter distance' : null,
+            ),
+            TextFormField(
+              controller: _paceController,
+              decoration: const InputDecoration(labelText: 'Pace (min/km)'),
+              validator: (v) => v!.isEmpty ? 'Enter pace' : null,
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(
+                _dateTime == null
+                    ? 'Pick date & time'
+                    : DateFormat('EEE, d MMM h:mm a').format(_dateTime!),
+              ),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: _pickDateTime,
+            ),
+            const SizedBox(height: 20),
+            FilledButton(onPressed: _save, child: const Text('Create')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _cityController.dispose();
+    _locationController.dispose();
+    _distanceController.dispose();
+    _paceController.dispose();
+    super.dispose();
   }
 }
 
@@ -471,99 +680,3 @@ class _Stat extends StatelessWidget {
     );
   }
 }
-
-/// -------------------- Demo data --------------------
-
-class Run {
-  final String id, title, city, dateLabel, timeLabel, location, paceMinPerKm;
-  final double distanceKm;
-  final List<User> participants;
-  Run({
-    required this.id,
-    required this.title,
-    required this.city,
-    required this.dateLabel,
-    required this.timeLabel,
-    required this.location,
-    required this.distanceKm,
-    required this.paceMinPerKm,
-    required this.participants,
-  });
-}
-
-class User {
-  final String name;
-  String get initials {
-    final parts = name.trim().split(' ');
-    if (parts.length == 1) return parts.first.characters.first.toUpperCase();
-    return (parts.first.characters.first + parts.last.characters.first)
-        .toUpperCase();
-  }
-
-  const User(this.name);
-}
-
-class Post {
-  final User author;
-  final String text, timeAgo;
-  const Post({required this.author, required this.text, required this.timeAgo});
-}
-
-final demoRuns = <Run>[
-  Run(
-    id: 'r1',
-    title: 'Sunrise 5K',
-    city: 'Riyadh',
-    dateLabel: 'Tue, 12 Nov',
-    timeLabel: '6:00 AM',
-    location: 'Kingdom Park Gate 3',
-    distanceKm: 5,
-    paceMinPerKm: '5:30',
-    participants: const [
-      User('Aisha Al Harbi'),
-      User('Omar Khan'),
-      User('Lina M'),
-      User('You'),
-    ],
-  ),
-  Run(
-    id: 'r2',
-    title: 'Corniche 10K',
-    city: 'Jeddah',
-    dateLabel: 'Fri, 15 Nov',
-    timeLabel: '7:00 PM',
-    location: 'Corniche Plaza',
-    distanceKm: 10,
-    paceMinPerKm: '5:45',
-    participants: const [User('Rami S'), User('Sara B'), User('Hassan')],
-  ),
-  Run(
-    id: 'r3',
-    title: 'Trail Fun Run',
-    city: 'Abha',
-    dateLabel: 'Sat, 23 Nov',
-    timeLabel: '5:30 AM',
-    location: 'Al Soudah Trailhead',
-    distanceKm: 8,
-    paceMinPerKm: '6:10',
-    participants: const [User('Maya'), User('Noura'), User('Ali')],
-  ),
-];
-
-final demoPosts = <Post>[
-  Post(
-    author: const User('Aisha Al Harbi'),
-    text: 'Crushed my intervals today. See you all at the Sunrise 5K! 🏃‍♀️',
-    timeAgo: '2h',
-  ),
-  Post(
-    author: const User('Omar Khan'),
-    text: 'Anyone up for an easy recovery run tomorrow?',
-    timeAgo: '5h',
-  ),
-  Post(
-    author: const User('Lina M'),
-    text: 'New shoes day ✨ Loving the bounce.',
-    timeAgo: '1d',
-  ),
-];
