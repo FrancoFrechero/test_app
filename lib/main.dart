@@ -536,7 +536,9 @@ class Run {
 class User {
   final String name;
   String get initials {
-    final parts = name.trim().split(' ');
+    final normalized = name.trim();
+    if (normalized.isEmpty) return '?';
+    final parts = normalized.split(RegExp(r'\s+'));
     if (parts.length == 1) return parts.first.characters.first.toUpperCase();
     return (parts.first.characters.first + parts.last.characters.first)
         .toUpperCase();
