@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-void main() => runApp(const RunClubApp());
+void main() => runApp(const StrideClubApp());
 
-class RunClubApp extends StatelessWidget {
-  const RunClubApp({super.key});
+class StrideClubApp extends StatelessWidget {
+  const StrideClubApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'RunClub',
+      title: 'StrideClub',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -28,7 +28,7 @@ class RootScaffold extends StatefulWidget {
 
 class _RootScaffoldState extends State<RootScaffold> {
   int _idx = 0;
-  final _pages = const [RunsPage(), FeedPage(), ProfilePage()];
+  final _pages = const [RunsPage(), FeedPage(), TipsPage(), ProfilePage()];
 
   @override
   Widget build(BuildContext context) {
@@ -50,6 +50,11 @@ class _RootScaffoldState extends State<RootScaffold> {
             icon: Icon(Icons.dynamic_feed_outlined),
             selectedIcon: Icon(Icons.dynamic_feed),
             label: 'Feed',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.lightbulb_outline),
+            selectedIcon: Icon(Icons.lightbulb),
+            label: 'Tips',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -409,6 +414,43 @@ class FeedPage extends StatelessWidget {
   }
 }
 
+/// -------------------- Tips --------------------
+
+class TipsPage extends StatelessWidget {
+  const TipsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        const SliverAppBar(
+          floating: true,
+          snap: true,
+          title: Text('Running Tips'),
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverList.separated(
+            itemBuilder: (context, i) {
+              final tip = demoTips[i];
+              return ListTile(
+                title: Text(tip.title),
+                subtitle: Text('${tip.category} • ${tip.description}'),
+                tileColor: Theme.of(context).colorScheme.surfaceVariant,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            },
+            separatorBuilder: (_, __) => const SizedBox(height: 12),
+            itemCount: demoTips.length,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// -------------------- Profile --------------------
 
 class ProfilePage extends StatelessWidget {
@@ -565,5 +607,36 @@ final demoPosts = <Post>[
     author: const User('Lina M'),
     text: 'New shoes day ✨ Loving the bounce.',
     timeAgo: '1d',
+  ),
+];
+
+/// -------------------- Demo tips --------------------
+
+class Tip {
+  final String title;
+  final String category;
+  final String description;
+  const Tip({
+    required this.title,
+    required this.category,
+    required this.description,
+  });
+}
+
+final demoTips = <Tip>[
+  const Tip(
+    title: 'Start Slow',
+    category: 'Beginner',
+    description: 'Ease into runs to avoid injury.',
+  ),
+  const Tip(
+    title: 'Fuel Right',
+    category: 'Nutrition',
+    description: 'Eat a balanced meal a few hours before.',
+  ),
+  const Tip(
+    title: 'Speed Work',
+    category: 'Advanced',
+    description: 'Include intervals once a week to build pace.',
   ),
 ];
